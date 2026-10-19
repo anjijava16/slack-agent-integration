@@ -1,0 +1,18 @@
+[project]
+name = "slack-fastapi-langgraph-agent"
+version = "1.1.0"
+description = "Slack agent: FastAPI + Slack Bolt + LangGraph, SQLite locally, Cloud SQL Postgres on Cloud Run"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 130
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["B008", "B904"]  # FastAPI Depends() defaults; explicit re-raise in routers
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+filterwarnings = ["ignore::DeprecationWarning"]

@@ -1,0 +1,13 @@
+# Only needed for running terraform by hand. CD passes these with -var flags.
+project_id               = "my-gcp-project-id"
+region                   = "us-central1"
+env                      = "test"
+service_name             = "slack-agent"
+image                    = "us-central1-docker.pkg.dev/my-gcp-project-id/slack-agent/slack-agent:manual"
+runtime_service_account  = "slack-agent-run@my-gcp-project-id.iam.gserviceaccount.com"
+cloudsql_connection_name = "my-gcp-project-id:us-central1:slack-agent-pg"
+llm_model                = "openai/gpt-4o-mini"
+slack_mode               = "http"
+slack_channel_id         = "C0123456789"
+require_api_key          = true
+max_instances            = 3

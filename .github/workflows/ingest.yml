@@ -1,0 +1,84 @@
+# Scheduled ingestion (the original bot ran its ingest the same way, on a GitHub Actions cron).
+# Calls the DEPLOYED service's /api/ingest endpoint, so Qdrant, Slack and Cohere credentials
+# never leave Secret Manager: this workflow only reads the env's API key (IAM: deployer SA ->
+# secretAccessor on <service>-<env>-api-key, granted in infra/platform).
+#
+# Runs Mondays 06:17 UTC for every course in config/courses.yaml on test, or by hand:
+#   Actions -> Ingest -> Run workflow (course, environment, sources)
+name: Ingest
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      course:
+        description: "Course key from config/courses.yaml (empty = all)"
+        default: ""
+      environment:
+        description: test or prod
+        type: choice
+        options: [test, prod]
+        default: test
+      sources:
+        description: "Comma list: faq,github,slack,youtube (empty = all)"
+        default: ""
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: ingest-${{ inputs.environment || 'test' }}
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    if: ${{ vars.QDRANT_URL != '' }}
+    runs-on: ubuntu-latest
+    env:
+      ENV: ${{ inputs.environment || 'test' }}
+      SERVICE: ${{ vars.SERVICE_NAME || 'slack-agent' }}
+      REGION: ${{ vars.GCP_REGION || 'us-central1' }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v3
+
+      - name: Ingest
+        env:
+          COURSE: ${{ inputs.course }}
+          SOURCES: ${{ inputs.sources }}
+        run: |
+          set -euo pipefail
+          url=$(gcloud run services describe "${SERVICE}-${ENV}" --region "$REGION" --format='value(status.url)')
+          key=$(gcloud secrets versions access latest --secret="${SERVICE}-${ENV}-api-key")
+          echo "::add-mask::$key"
+          courses="$COURSE"
+          [ -n "$courses" ] || courses=$(python3 -c "import yaml; print(' '.join(yaml.safe_load(open('config/courses.yaml'))['courses']))")
+          body='{}'
+          if [ -n "$SOURCES" ]; then
+            body=$(python3 -c "import json,sys; print(json.dumps({'sources': [s for s in sys.argv[1].split(',') if s]}))" "$SOURCES")
+          fi
+          failed=0
+          for course in $courses; do
+            echo "::group::$course"
+            job=$(curl -fsS -X POST "$url/api/ingest/course/$course" -H "X-API-Key: $key" -H 'Content-Type: application/json' -d "$body")
+            id=$(echo "$job" | python3 -c "import json,sys; print(json.load(sys.stdin)['job_id'])")
+            for _ in $(seq 1 180); do  # up to 30 minutes
+              status=$(curl -fsS "$url/api/ingest/jobs/$id" -H "X-API-Key: $key")
+              state=$(echo "$status" | python3 -c "import json,sys; print(json.load(sys.stdin)['status'])")
+              [ "$state" = succeeded ] || [ "$state" = failed ] && break
+              sleep 10
+            done
+            echo "$status" | python3 -m json.tool
+            { echo "### $course ($ENV): $state"; echo '```json'; echo "$status" | python3 -m json.tool; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+            [ "$state" = succeeded ] || failed=1
+            echo "::endgroup::"
+          done
+          exit $failed

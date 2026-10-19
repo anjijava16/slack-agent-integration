@@ -1,0 +1,59 @@
+# Create the app from this manifest: https://api.slack.com/apps -> Create New App -> From a manifest
+# HTTP version: replace https://YOUR-HOST with your public URL (ngrok, Cloud Run, ALB...).
+display_information:
+  name: Ops Buddy
+  description: LangGraph agent running on FastAPI
+  background_color: "#1d3557"
+features:
+  app_home:
+    home_tab_enabled: false
+    messages_tab_enabled: true
+    messages_tab_read_only_enabled: false
+  bot_user:
+    display_name: Ops Buddy
+    always_online: true
+  slash_commands:
+    - command: /agent
+      description: Ask the agent anything
+      usage_hint: how many PTO days do I get per quarter?
+      should_escape: false
+      url: https://YOUR-HOST/slack/events
+    - command: /agent-add
+      description: Add two numbers (no LLM)
+      usage_hint: "2 3"
+      should_escape: false
+      url: https://YOUR-HOST/slack/events
+    - command: /faq
+      description: Ask a course FAQ question (searches FAQ, Slack history, repo, videos)
+      usage_hint: "[course] how do I connect to postgres from docker?"
+      should_escape: false
+      url: https://YOUR-HOST/slack/events
+oauth_config:
+  scopes:
+    bot:
+      - app_mentions:read     # receive @Ops Buddy mentions
+      - chat:write            # post and update messages
+      - chat:write.public     # post in public channels without being invited
+      - commands              # slash commands
+      - im:history            # read DMs sent to the bot
+      - im:read
+      - im:write
+      - channels:history      # message.channels ("hello" listener) + Slack history ingestion
+      - channels:read         # channel names for source titles
+      - groups:read
+      - groups:history        # same for private channels
+      - reactions:write       # :eyes: / :white_check_mark: status reactions
+settings:
+  event_subscriptions:
+    request_url: https://YOUR-HOST/slack/events
+    bot_events:
+      - app_mention
+      - message.im
+      - message.channels
+      - message.groups
+  interactivity:
+    is_enabled: true
+    request_url: https://YOUR-HOST/slack/events
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false

@@ -1,0 +1,24 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+.pytest_cache/
+.ruff_cache/
+.DS_Store
+
+# local SQLite database (runs, feedback, conversation memory)
+#data/
+
+# terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+tfplan
+crash.log
+
+# written by scripts/gcp-setup.sh, read by scripts/github-setup.sh
+.gcp-setup.env
+slack_manifests/out/

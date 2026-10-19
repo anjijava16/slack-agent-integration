@@ -1,0 +1,36 @@
+# Web server
+fastapi>=0.115
+uvicorn[standard]>=0.30
+
+# Slack
+slack_bolt>=1.21
+slack_sdk>=3.33
+aiohttp>=3.9          # async HTTP + WebSocket client used by slack_sdk's async APIs
+
+# Agent
+langgraph>=1.0
+langchain-core>=1.0
+langchain-openai>=1.0
+
+# Database: SQLite locally, PostgreSQL (Cloud SQL) on Cloud Run
+asyncpg>=0.29                         # feedback store on Postgres
+aiosqlite>=0.20                       # feedback store + checkpointer on SQLite
+langgraph-checkpoint-sqlite>=2.0      # conversation memory, local
+langgraph-checkpoint-postgres>=2.0    # conversation memory, cloud
+psycopg[binary,pool]>=3.2             # driver used by the Postgres checkpointer
+
+# RAG: course FAQ bot (LlamaIndex + Qdrant, hybrid search)
+llama-index-core>=0.12
+llama-index-vector-stores-qdrant>=0.6
+qdrant-client>=1.15
+fastembed>=0.5                        # local ONNX embeddings + cross-encoder re-ranker (no torch)
+python-frontmatter>=1.1               # DataTalksClub/faq entries
+youtube-transcript-api>=1.1
+pypdf>=5.0                            # PDF uploads
+python-multipart>=0.0.9               # /api/ingest/files uploads
+pyyaml>=6.0                           # config/courses.yaml
+
+# Config
+pydantic>=2.7
+pydantic-settings>=2.3
+python-dotenv>=1.0

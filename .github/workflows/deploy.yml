@@ -1,0 +1,121 @@
+# Reusable: terraform apply infra/cloudrun for ONE environment, then smoke-test it.
+# Called by cd.yml (test, then prod) with the image built once in that run.
+name: Deploy environment
+
+on:
+  workflow_call:
+    inputs:
+      env:
+        description: test | prod
+        type: string
+        required: true
+      github_environment:
+        description: GitHub environment (protection rules, URL in the UI)
+        type: string
+        required: true
+      image:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    name: ${{ inputs.env }}
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.github_environment }}
+      url: ${{ steps.out.outputs.url }}
+    concurrency:
+      group: deploy-${{ inputs.env }}
+      cancel-in-progress: false # never cancel half-way through terraform apply
+    env:
+      ENV: ${{ inputs.env }}
+      PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      REGION: ${{ vars.GCP_REGION || 'us-central1' }}
+      SERVICE: ${{ vars.SERVICE_NAME || 'slack-agent' }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Authenticate to Google Cloud (WIF)
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SA }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.13.3
+          terraform_wrapper: false # so `terraform output -raw` prints clean values
+
+      - name: Terraform init (state per environment)
+        working-directory: infra/cloudrun
+        run: |
+          terraform init -input=false \
+            -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
+            -backend-config="prefix=${SERVICE}/cloudrun/${ENV}"
+
+      - name: Terraform plan
+        working-directory: infra/cloudrun
+        run: |
+          terraform plan -input=false -out=tfplan \
+            -var="project_id=${PROJECT_ID}" \
+            -var="region=${REGION}" \
+            -var="env=${ENV}" \
+            -var="service_name=${SERVICE}" \
+            -var="image=${{ inputs.image }}" \
+            -var="runtime_service_account=${{ vars.GCP_RUNTIME_SA }}" \
+            -var="cloudsql_connection_name=${{ vars.CLOUDSQL_CONNECTION_NAME }}" \
+            -var="llm_model=${{ vars.LLM_MODEL || 'openai/gpt-4o-mini' }}" \
+            -var="slack_mode=${{ vars.SLACK_MODE || 'http' }}" \
+            -var="slack_channel_id=${{ vars.SLACK_CHANNEL_ID }}" \
+            -var="require_api_key=${{ vars.REQUIRE_API_KEY != 'false' }}" \
+            -var="min_instances=${{ vars.MIN_INSTANCES || '0' }}" \
+            -var="max_instances=${{ vars.MAX_INSTANCES || '3' }}" \
+            -var="rag_enabled=${{ vars.QDRANT_URL != '' }}" \
+            -var="qdrant_url=${{ vars.QDRANT_URL }}" \
+            -var="rerank_provider=${{ vars.RERANK_PROVIDER || 'fastembed' }}"
+
+      - name: Terraform apply
+        working-directory: infra/cloudrun
+        run: terraform apply -input=false -auto-approve tfplan
+
+      - id: out
+        name: Read outputs
+        working-directory: infra/cloudrun
+        run: |
+          echo "url=$(terraform output -raw service_url)" >> "$GITHUB_OUTPUT"
+          echo "slack_url=$(terraform output -raw slack_request_url)" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke test
+        # /health = process up, /ready = Cloud SQL (and Qdrant, when RAG is on) reachable, unsigned /slack/events = 401
+        # (proves HTTP mode is on AND signature verification is enforced).
+        run: |
+          url="${{ steps.out.outputs.url }}"
+          for i in $(seq 1 24); do
+            if curl -fsS "$url/health"; then echo; break; fi
+            [ "$i" = 24 ] && { echo "::error::$url/health never came up"; exit 1; }
+            sleep 5
+          done
+          curl -fsS "$url/ready" || { echo "::error::/ready failed: the service can't reach Cloud SQL"; exit 1; }
+          echo
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$url/slack/events" \
+                   -H 'Content-Type: application/json' -d '{"type":"url_verification","challenge":"x"}')
+          if [ "$code" != "401" ]; then
+            echo "::error::unsigned POST /slack/events returned $code, expected 401"; exit 1
+          fi
+          echo "unsigned Slack request rejected with 401, as it should be"
+
+      - name: Deployment summary
+        if: always()
+        run: |
+          {
+            echo "### ${ENV}"
+            echo "- Service: \`${SERVICE}-${ENV}\` in \`${REGION}\`"
+            echo "- Image: \`${{ inputs.image }}\`"
+            echo "- URL: ${{ steps.out.outputs.url }}"
+            echo "- Slack Request URL: \`${{ steps.out.outputs.slack_url }}\`"
+            echo "  (events, interactivity and slash commands; \`bash scripts/slack-manifest.sh ${ENV}\` prints a ready manifest)"
+          } >> "$GITHUB_STEP_SUMMARY"

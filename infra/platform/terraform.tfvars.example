@@ -1,0 +1,9 @@
+# Only needed if you run terraform by hand. scripts/gcp-setup.sh passes these with -var.
+project_id        = "my-gcp-project-id"
+region            = "us-central1"
+service_name      = "slack-agent"
+environments      = ["test", "prod"]
+github_repository = "anjijava16/slack-fastapi-langgraph-agent"
+github_branch     = "develop"
+state_bucket      = "my-gcp-project-id-tfstate"
+db_tier           = "db-f1-micro"

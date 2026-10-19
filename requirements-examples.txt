@@ -1,0 +1,4 @@
+# Extra packages for the standalone scripts in examples/
+-r requirements.txt
+openai>=1.50               # examples 01 and 03 call OpenAI directly
+# example 03 also uses psycopg[binary,pool], already in requirements.txt

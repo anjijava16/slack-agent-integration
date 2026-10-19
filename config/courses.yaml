@@ -1,0 +1,81 @@
+# Courses the FAQ bot knows about. One Qdrant collection per course
+# (<QDRANT_COLLECTION_PREFIX><key>, e.g. "faq_llm" locally, "test_faq_llm" on Cloud Run).
+#
+# channels         Slack channels where an @mention is answered from THIS course's
+#                  materials (RAG). Mentions anywhere else go to the general agent,
+#                  which can still search courses through its search_course_materials tool.
+# slack_ingest     channels whose recent threads are indexed (slack_days back)
+# faq_dir          folder under _questions/ in github.com/DataTalksClub/faq
+# repos            course GitHub repos to index (include/exclude filters optional)
+# youtube_videos   video ids whose transcripts are indexed
+#
+# Channel ids below are the DataTalks.Club workspace ids used by the original
+# faq-slack-bot. In your own workspace, replace them with yours
+# (channel name -> View channel details -> bottom of the About tab).
+courses:
+  de:
+    name: Data Engineering Zoomcamp
+    short_name: DE
+    cohort_year: 2026
+    course_start_date: 12 January 2026
+    channels: [C01FABYF2RG, C06CBSE16JC, C06BZJX8PSP]
+    slack_ingest: [C01FABYF2RG]
+    slack_days: 90
+    faq_dir: data-engineering-zoomcamp
+    repos:
+      - owner: DataTalksClub
+        repo: data-engineering-zoomcamp
+        branch: main
+        exclude_dirs: [.github, images, cohorts/2022, cohorts/2023, cohorts/2024]
+    youtube_videos: [X8cEEwi8DTM]
+
+  ml:
+    name: Machine Learning Zoomcamp
+    short_name: ML
+    cohort_year: 2025
+    course_start_date: 15 September 2025
+    channels: [C0288NJ5XSA, C05C3SGMLBB, C05DTQECY66]
+    slack_ingest: [C0288NJ5XSA]
+    slack_days: 90
+    faq_dir: machine-learning-zoomcamp
+    repos:
+      - owner: DataTalksClub
+        repo: machine-learning-zoomcamp
+        branch: master
+      - owner: alexeygrigorev
+        repo: mlbookcamp-code
+        branch: master
+        exclude_dirs: [.github, course-zoomcamp, images, util]
+    youtube_videos: []
+
+  mlops:
+    name: MLOps Zoomcamp
+    short_name: MLOps
+    cohort_year: 2025
+    course_start_date: 5 May 2025
+    channels: [C02R98X7DS9, C06C1N46CQ1, C0735558X52]
+    slack_ingest: [C02R98X7DS9]
+    slack_days: 90
+    faq_dir: mlops-zoomcamp
+    repos:
+      - owner: DataTalksClub
+        repo: mlops-zoomcamp
+        branch: main
+        exclude_dirs: [.github, images, cohorts/2022, cohorts/2023, cohorts/2024]
+    youtube_videos: []
+
+  llm:
+    name: LLM Zoomcamp
+    short_name: LLM
+    cohort_year: 2025
+    course_start_date: 2 June 2025
+    channels: [C079QE5NAMP, C078X7REVN3, C06TEGTGM3J]
+    slack_ingest: [C06TEGTGM3J]
+    slack_days: 90
+    faq_dir: llm-zoomcamp
+    repos:
+      - owner: DataTalksClub
+        repo: llm-zoomcamp
+        branch: main
+        exclude_dirs: [.github, images, cohorts/2024]
+    youtube_videos: [GH3lrOsU3AU, FgnelhEJFj0, 8lgiOLMMKcY]
